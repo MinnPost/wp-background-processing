@@ -277,13 +277,9 @@ if ( ! class_exists( 'WP_Background_Process' ) ) {
 			LIMIT 1
 		", $key ) );
 
-			if ( is_object( $query ) ) {
-				$batch       = new stdClass();
-				$batch->key  = $query->$column;
-				$batch->data = maybe_unserialize( $query->$value_column );
-			} else {
-				$batch = '';
-			}
+			$batch       = new stdClass();
+			$batch->key  = $query->$column;
+			$batch->data = maybe_unserialize( $query->$value_column );
 
 			return $batch;
 		}
@@ -300,31 +296,29 @@ if ( ! class_exists( 'WP_Background_Process' ) ) {
 			do {
 				$batch = $this->get_batch();
 
-				if ( is_object( $batch ) ) {
-					foreach ( $batch->data as $key => $value ) {
-						$task = $this->task( $value );
+				foreach ( $batch->data as $key => $value ) {
+					$task = $this->task( $value );
 
-						if ( false !== $task ) {
-							$batch->data[ $key ] = $task;
-						} else {
-							unset( $batch->data[ $key ] );
-						}
-
-						if ( $this->time_exceeded() || $this->memory_exceeded() ) {
-							// Batch limits reached.
-							break;
-						}
-					}
-
-
-					// Update or delete current batch.
-					if ( ! empty( $batch->data ) ) {
-						$this->update( $batch->key, $batch->data );
+					if ( false !== $task ) {
+						$batch->data[ $key ] = $task;
 					} else {
-						$this->delete( $batch->key );
+						unset( $batch->data[ $key ] );
 					}
-				
+
+					if ( $this->time_exceeded() || $this->memory_exceeded() ) {
+						// Batch limits reached.
+						break;
+					}
 				}
+
+
+				// Update or delete current batch.
+				if ( ! empty( $batch->data ) ) {
+					$this->update( $batch->key, $batch->data );
+				} else {
+					$this->delete( $batch->key );
+				}
+				
 			} while ( ! $this->time_exceeded() && ! $this->memory_exceeded() && ! $this->is_queue_empty() );
 
 			$this->unlock_process();
